@@ -108,7 +108,7 @@ function install_yum {
     else
         if [ -n "${YUM_YUM}" ]; then
             CMD=$YUM_YUM
-	fi
+    fi
     fi
 
     if [ "${CMD}" != "" ]; then
@@ -146,6 +146,16 @@ function get_python_for_lldb {
         return 1
     fi
     return 0
+}
+
+function found_exe {
+    VALUE=$(echo "${PATH}" | sed $'s/:/\\\n/g' | while read -r line; do 
+        if [ -x "${line}/voltron" ]; then 
+            echo "1"
+            break
+        fi
+    done)
+    [ -z "$VALUE" ] && echo "0" || echo "1"
 }
 
 if [ "${BACKEND_GDB}" -eq 1 ]; then
@@ -272,16 +282,6 @@ if [ "${BACKEND_GDB}" -ne 1 ] && [ "${BACKEND_LLDB}" -ne 1 ]; then
     echo "  Packages directory: $PYTHON_SITE_PACKAGES"
     echo "  Did not add Voltron to any debugger init files."
 fi
-
-found_exe() {
-    VALUE=$(echo "${PATH}" | sed $'s/:/\\\n/g' | while read -r line; do 
-        if [ -x "${line}/voltron" ]; then 
-            echo "1"
-            break
-        fi
-    done)
-    [ -z "$VALUE" ] && echo "0" || echo "1"
-}
 
 if [ "${BACKEND_GDB}" -eq 1 ] || [ "${BACKEND_LLDB}" -eq 1 ]; then
     if [ "$(found_exe)" -eq "0"  ]; then 
