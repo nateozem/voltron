@@ -148,14 +148,15 @@ function get_python_for_lldb {
     return 0
 }
 
-function found_exe {
+function get_executable_path {
     VALUE=$(echo "${PATH}" | sed $'s/:/\\\n/g' | while read -r line; do 
-        if [ -x "${line}/voltron" ]; then 
-            echo "1"
+        EXE_PATH="${line}/voltron"
+        if [ -x "${EXE_PATH}" ]; then 
+            echo "${EXE_PATH}"
             break
         fi
     done)
-    [ -z "$VALUE" ] && echo "0" || echo "1"
+    [ -n "${VALUE}" ] && echo "${VALUE}" || return 1
 }
 
 if [ "${BACKEND_GDB}" -eq 1 ]; then
@@ -283,8 +284,10 @@ if [ "${BACKEND_GDB}" -ne 1 ] && [ "${BACKEND_LLDB}" -ne 1 ]; then
     echo "  Did not add Voltron to any debugger init files."
 fi
 
+# Print path to executable. If not found in PATH, then print instruction.
 if [ "${BACKEND_GDB}" -eq 1 ] || [ "${BACKEND_LLDB}" -eq 1 ]; then
-    if [ "$(found_exe)" -eq "0"  ]; then 
+    EXE_PATH="$(get_executable_path)"
+    if [ -z "${EXE_PATH}" ]; then 
         PREFIX_DIR=${PYTHON_SITE_PACKAGES%lib*}
         if ! [ "${PREFIX_DIR}" == "${PYTHON_SITE_PACKAGES}" ]; then 
             BIN_DIR=${PREFIX_DIR}bin
@@ -294,6 +297,8 @@ if [ "${BACKEND_GDB}" -eq 1 ] || [ "${BACKEND_LLDB}" -eq 1 ]; then
                 printf "  export PATH=\"\$PATH:%s\" >> ~/.zshrc" "$BIN_DIR"
             fi
         fi
+    else
+        echo "Installed path for \"voltron\": ${EXE_PATH}" 
     fi
 fi
 
