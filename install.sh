@@ -86,7 +86,7 @@ if [ "${BACKEND_LLDB}" -eq 1 ] && [ -z "${LLDB}" ]; then
     exit 1
 fi
 
-set -ex
+# set -ex
 
 function install_apt {
     if [ -n "${APT_GET}" ]; then
@@ -130,6 +130,24 @@ function install_packages {
     install_yum
 }
 
+function get_python_for_lldb {
+    LLDB_LIB="$(${LLDB} -P)/lldb/_lldb.so"
+    if [ -e "${LLDB_LIB}" ]; then
+        LLDB_PYTHON_PATH="$(otool -L "${LLDB_LIB}" | grep -i "python.framework" | cut -f 2 | sed -e 's/\(.*\)\s*(.*)/\1/g')"
+        LLDB_PYTHON="$(dirname "${LLDB_PYTHON_PATH}")/bin/python"
+        if [ -x "${LLDB_PYTHON}" ]; then
+            echo "${LLDB_PYTHON}"
+        else
+            echo "\"${LLDB_PYTHON}\" is not python executable" 1>&2 
+            return 1
+        fi
+    else
+        echo "\"${LLDB_LIB}\" doesn't exist" 1>&2
+        return 1
+    fi
+    return 0
+}
+
 if [ "${BACKEND_GDB}" -eq 1 ]; then
     # Find the Python version used by GDB
     GDB_PYVER=$(${GDB} -batch -q --nx -ex 'pi import platform; print(".".join(platform.python_version_tuple()[:2]))')
@@ -161,11 +179,13 @@ if [ "${BACKEND_GDB}" -eq 1 ]; then
     echo "source $GDB_ENTRY_FILE" >> ${GDB_INIT_FILE}
 fi
 
-if [ "${BACKEND_LLDB}" -eq 1 ]; then
-    # Find the Python version used by LLDB
-    LLDB_PYVER=$(${LLDB} -Qxb --one-line 'script import platform; print(".".join(platform.python_version_tuple()[:2]))'|tail -1)
-    LLDB_PYTHON=$(${LLDB} -Qxb --one-line 'script import sys; print(sys.executable)'|tail -1)
-    LLDB_PYTHON="${LLDB_PYTHON/%$LLDB_PYVER/}${LLDB_PYVER}"
+LLDB_PYTHON="$(get_python_for_lldb)"
+
+if [ "${BACKEND_LLDB}" -eq 1 ] && [ -n "${LLDB_PYTHON}" ]; then
+    # # Find the Python version used by LLDB
+    # LLDB_PYVER=$(${LLDB} -Qxb --one-line 'script import platform; print(".".join(platform.python_version_tuple()[:2]))'|tail -1)
+    # LLDB_PYTHON=$(${LLDB} -Qxb --one-line 'script import sys; print(sys.executable)'|tail -1)
+    # LLDB_PYTHON="${LLDB_PYTHON/%$LLDB_PYVER/}${LLDB_PYVER}"
 
     ${LLDB_PYTHON} -m pip install --user --upgrade six    
 
@@ -254,26 +274,26 @@ if [ "${BACKEND_GDB}" -ne 1 ] && [ "${BACKEND_LLDB}" -ne 1 ]; then
 fi
 
 found_exe() {
-	VALUE=$(echo "${PATH}" | sed $'s/:/\\\n/g' | while read -r line; do 
-		if [ -x "${line}/voltron" ]; then 
-			echo "1"
-			break
-		fi
-	done)
-	[ -z "$VALUE" ] && echo "0" || echo "1"
+    VALUE=$(echo "${PATH}" | sed $'s/:/\\\n/g' | while read -r line; do 
+        if [ -x "${line}/voltron" ]; then 
+            echo "1"
+            break
+        fi
+    done)
+    [ -z "$VALUE" ] && echo "0" || echo "1"
 }
 
 if [ "${BACKEND_GDB}" -eq 1 ] || [ "${BACKEND_LLDB}" -eq 1 ]; then
-	if [ "$(found_exe)" -eq "0"  ]; then 
-		PREFIX_DIR=${PYTHON_SITE_PACKAGES%lib*}
-		if ! [ "${PREFIX_DIR}" == "${PYTHON_SITE_PACKAGES}" ]; then 
-			BIN_DIR=${PREFIX_DIR}bin
-			if [ -e "${BIN_DIR}/voltron" ]; then
-				printf "\nIf have issues of comand not found, one of the following lines should help.\n"
-				printf "  export PATH=\"\$PATH:%s\" >> ~/.bashrc" "$BIN_DIR"
-				printf "  export PATH=\"\$PATH:%s\" >> ~/.zshrc" "$BIN_DIR"
-			fi
-		fi
-	fi
+    if [ "$(found_exe)" -eq "0"  ]; then 
+        PREFIX_DIR=${PYTHON_SITE_PACKAGES%lib*}
+        if ! [ "${PREFIX_DIR}" == "${PYTHON_SITE_PACKAGES}" ]; then 
+            BIN_DIR=${PREFIX_DIR}bin
+            if [ -e "${BIN_DIR}/voltron" ]; then
+                printf "\nIf have issues of comand not found, one of the following lines should help.\n"
+                printf "  export PATH=\"\$PATH:%s\" >> ~/.bashrc" "$BIN_DIR"
+                printf "  export PATH=\"\$PATH:%s\" >> ~/.zshrc" "$BIN_DIR"
+            fi
+        fi
+    fi
 fi
 
