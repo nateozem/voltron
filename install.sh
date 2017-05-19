@@ -130,6 +130,34 @@ function install_packages {
     install_yum
 }
 
+# Input:  <python-path>
+function get_lib_path {
+	if [ "$#" -eq "0" ]; then 
+		echo "Require argument: <python-path>" 1>&2
+		return 1
+	fi
+	PYTHON_EXE="$1"
+	VALUE=$(${PYTHON_EXE} -m pip show voltron | grep -e '^Location' | sed -e 's/^Location: \(.*\)/\1/g')
+	echo "${VALUE}"
+}
+
+# Input:  <python-path>
+# Return: "ok", "missing", "outdated"
+function check_install_status {
+	if [ "$#" -eq "0" ]; then 
+		echo "Require argument: <python-path>" 1>&2
+		return 1
+	fi
+	PYTHON_EXE="$1"
+	if [ -z "$(${PYTHON_EXE} -m pip list --format columns | grep -w voltron)" ]; then
+		echo "missing"
+	elif [ -n "$(${PYTHON_EXE} -m pip list --format columns --outdated | grep -w voltron)" ]; then
+		echo "outdated"
+	else
+		echo "ok"
+	fi
+}
+
 function get_python_for_lldb {
     LLDB_LIB="$(${LLDB} -P)/lldb/_lldb.so"
     if [ -e "${LLDB_LIB}" ]; then
@@ -201,21 +229,21 @@ if [ "${BACKEND_LLDB}" -eq 1 ] && [ -n "${LLDB_PYTHON}" ]; then
         ${LLDB_PYTHON} -m pip install --user virtualenv
         ${LLDB_PYTHON} -m virtualenv "${VENV}"
         LLDB_PYTHON="${VENV}/bin/python"
-        LLDB_SITE_PACKAGES=$(find "${VENV}" -name site-packages)
-    elif [ -z "${USER_MODE}" ]; then
-        LLDB_SITE_PACKAGES=$(${LLDB} -Qxb --one-line 'script import site; print(site.getsitepackages()[0])'|tail -1)
-    else
-        LLDB_SITE_PACKAGES=$(${LLDB} -Qxb --one-line 'script import site; print(site.getusersitepackages())'|tail -1)
     fi
 
     install_packages
 
-    if [ "$LLDB_SITE_PACKAGES" == "$GDB_SITE_PACKAGES" ]; then
+	STATUS="$(check_install_status ${LLDB_PYTHON})"
+
+    # if [ "$LLDB_SITE_PACKAGES" == "$GDB_SITE_PACKAGES" ]; then
+    if [ "${STATUS}" == "ok" ]; then
         echo "Skipping installation for LLDB - same site-packages directory"
     else
         # Install Voltron and dependencies
         ${SUDO} ${LLDB_PYTHON} -m pip install -U $USER_MODE $DEV_MODE .
     fi
+
+	LLDB_SITE_PACKAGES="$(get_lib_path ${LLDB_PYTHON})"
 
     # Add Voltron to lldbinit
     LLDB_INIT_FILE="${HOME}/.lldbinit"
