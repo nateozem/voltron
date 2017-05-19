@@ -133,11 +133,11 @@ function install_packages {
 # Input:  <python-path>
 function get_lib_path {
 
-	if [ "$#" -eq "0" ]; then 
-		echo "Require argument: <python-path>" 1>&2
-		return 1
-	fi
-	PYTHON_EXE="$1"
+    if [ "$#" -eq "0" ]; then 
+        echo "Require argument: <python-path>" 1>&2
+        return 1
+    fi
+    PYTHON_EXE="$1"
 
     # if [ -n "${VENV}" ]; then
     #     echo "Creating virtualenv..."
@@ -152,27 +152,27 @@ function get_lib_path {
     # fi
 
     if [ -n "${VENV}" ] || [ -z ${USER_MODE} ]; then
-		${PYTHON_EXE} -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())'
-	else
-		${PYTHON_EXE} -c 'import site; print site.getusersitepackages()'
+        ${PYTHON_EXE} -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())'
+    else
+        ${PYTHON_EXE} -c 'import site; print site.getusersitepackages()'
     fi
 }
 
 # Input:  <python-path>
 # Return: "ok", "missing", "outdated"
 function check_install_status {
-	if [ "$#" -eq "0" ]; then 
-		echo "Require argument: <python-path>" 1>&2
-		return 1
-	fi
-	PYTHON_EXE="$1"
-	if [ -z "$(${PYTHON_EXE} -m pip list --format columns | grep -w voltron)" ]; then
-		echo "missing"
-	elif [ -n "$(${PYTHON_EXE} -m pip list --format columns --outdated | grep -w voltron)" ]; then
-		echo "outdated"
-	else
-		echo "ok"
-	fi
+    if [ "$#" -eq "0" ]; then 
+        echo "Require argument: <python-path>" 1>&2
+        return 1
+    fi
+    PYTHON_EXE="$1"
+    if [ -z "$(${PYTHON_EXE} -m pip list --format columns | grep -w voltron)" ]; then
+        echo "missing"
+    elif [ -n "$(${PYTHON_EXE} -m pip list --format columns --outdated | grep -w voltron)" ]; then
+        echo "outdated"
+    else
+        echo "ok"
+    fi
 }
 
 function get_python_for_lldb {
@@ -202,6 +202,28 @@ function get_executable_path {
         fi
     done)
     [ -n "${VALUE}" ] && echo "${VALUE}" || return 1
+}
+
+function find_executable_basedir {
+    EXE_PATH="$(get_executable_path)"
+    if [ -z "$EXE_PATH" ]; then
+        PYTHON=$(command -v python)
+        PYTHON_SITE_PACKAGES="$(get_lib_path ${PYTHON})"
+        PREFIX_DIR=${PYTHON_SITE_PACKAGES%lib*}
+        if ! [ "${PREFIX_DIR}" == "${PYTHON_SITE_PACKAGES}" ]; then 
+            BIN_DIR=${PREFIX_DIR}bin
+            if [ -x "${BIN_DIR}/voltron" ]; then
+                EXE_PATH="$BIN_DIR"
+            fi
+        fi
+    fi
+    if [ -z "$EXE_PATH" ]; then
+        BIN_DIR="/usr/local/bin"
+        if [ -x "${BIN_DIR}/voltron" ]; then
+            EXE_PATH="$BIN_DIR"
+        fi
+    fi
+    [ -n "$EXE_PATH" ] && echo "$EXE_PATH" || return 1
 }
 
 if [ "${BACKEND_GDB}" -eq 1 ]; then
@@ -284,11 +306,11 @@ if [ "${BACKEND_GDB}" -ne 1 ] && [ "${BACKEND_LLDB}" -ne 1 ]; then
     # Find system Python
     PYTHON=$(command -v python)
     PYVER=$(${PYTHON} -c 'import platform; print(".".join(platform.python_version_tuple()[:2]))')
-    # if [ -z $USER_MODE ]; then
-    #     PYTHON_SITE_PACKAGES=$(${PYTHON} -c 'import site; print(site.getsitepackages()[0])')
-    # else
-    #     PYTHON_SITE_PACKAGES=$(${PYTHON} -c 'import site; print(site.getusersitepackages())')
-    # fi
+    if [ -z $USER_MODE ]; then
+        PYTHON_SITE_PACKAGES=$(${PYTHON} -c 'import site; print(site.getsitepackages()[0])')
+    else
+        PYTHON_SITE_PACKAGES=$(${PYTHON} -c 'import site; print(site.getusersitepackages())')
+    fi
 
     install_packages
 
@@ -325,21 +347,36 @@ if [ "${BACKEND_GDB}" -ne 1 ] && [ "${BACKEND_LLDB}" -ne 1 ]; then
     echo "  Did not add Voltron to any debugger init files."
 fi
 
+# # Print path to executable. If not found in PATH, then print instruction.
+# if [ "${BACKEND_GDB}" -eq 1 ] || [ "${BACKEND_LLDB}" -eq 1 ]; then
+#     EXE_PATH="$(get_executable_path)"
+#     if [ -z "${EXE_PATH}" ]; then 
+# 		PYTHON=$(command -v python)
+# 		PYTHON_SITE_PACKAGES="$(get_lib_path ${PYTHON})"
+#         PREFIX_DIR=${PYTHON_SITE_PACKAGES%lib*}
+#         if ! [ "${PREFIX_DIR}" == "${PYTHON_SITE_PACKAGES}" ]; then 
+#             BIN_DIR=${PREFIX_DIR}bin
+#             if [ -e "${BIN_DIR}/voltron" ]; then
+#                 printf "\nIf have issues of comand not found, one of the following lines should help.\n"
+#                 printf "  export PATH=\"\$PATH:%s\" >> ~/.bashrc" "$BIN_DIR"
+#                 printf "  export PATH=\"\$PATH:%s\" >> ~/.zshrc" "$BIN_DIR"
+#             fi
+#         fi
+#     else
+#         echo "Installed path for \"voltron\": ${EXE_PATH}" 
+#     fi
+# fi
+
 # Print path to executable. If not found in PATH, then print instruction.
 if [ "${BACKEND_GDB}" -eq 1 ] || [ "${BACKEND_LLDB}" -eq 1 ]; then
     EXE_PATH="$(get_executable_path)"
     if [ -z "${EXE_PATH}" ]; then 
-		PYTHON=$(command -v python)
-		PYTHON_SITE_PACKAGES="$(get_lib_path ${PYTHON})"
-        PREFIX_DIR=${PYTHON_SITE_PACKAGES%lib*}
-        if ! [ "${PREFIX_DIR}" == "${PYTHON_SITE_PACKAGES}" ]; then 
-            BIN_DIR=${PREFIX_DIR}bin
-            if [ -e "${BIN_DIR}/voltron" ]; then
-                printf "\nIf have issues of comand not found, one of the following lines should help.\n"
-                printf "  export PATH=\"\$PATH:%s\" >> ~/.bashrc" "$BIN_DIR"
-                printf "  export PATH=\"\$PATH:%s\" >> ~/.zshrc" "$BIN_DIR"
-            fi
-        fi
+		BIN_DIR="$(find_executable_basedir)"
+		if [ -e "${BIN_DIR}/voltron" ]; then
+			printf "\nIf have issues of comand not found, one of the following lines should help.\n"
+			printf "  export PATH=\"\$PATH:%s\" >> ~/.bashrc" "$BIN_DIR"
+			printf "  export PATH=\"\$PATH:%s\" >> ~/.zshrc" "$BIN_DIR"
+		fi
     else
         echo "Installed path for \"voltron\": ${EXE_PATH}" 
     fi
