@@ -132,13 +132,30 @@ function install_packages {
 
 # Input:  <python-path>
 function get_lib_path {
+
 	if [ "$#" -eq "0" ]; then 
 		echo "Require argument: <python-path>" 1>&2
 		return 1
 	fi
 	PYTHON_EXE="$1"
-	VALUE=$(${PYTHON_EXE} -m pip show voltron | grep -e '^Location' | sed -e 's/^Location: \(.*\)/\1/g')
-	echo "${VALUE}"
+
+    # if [ -n "${VENV}" ]; then
+    #     echo "Creating virtualenv..."
+    #     ${LLDB_PYTHON} -m pip install --user virtualenv
+    #     ${LLDB_PYTHON} -m virtualenv "${VENV}"
+    #     LLDB_PYTHON="${VENV}/bin/python"
+    #     LLDB_SITE_PACKAGES=$(find "${VENV}" -name site-packages)
+    # elif [ -z "${USER_MODE}" ]; then
+    #     LLDB_SITE_PACKAGES=$(${LLDB} -Qxb --one-line 'script import site; print(site.getsitepackages()[0])'|tail -1)
+    # else
+    #     LLDB_SITE_PACKAGES=$(${LLDB} -Qxb --one-line 'script import site; print(site.getusersitepackages())'|tail -1)
+    # fi
+
+    if [ -n "${VENV}" ] || [ -z ${USER_MODE} ]; then
+		${PYTHON_EXE} -c 'from distutils.sysconfig import get_python_lib; print(get_python_lib())'
+	else
+		${PYTHON_EXE} -c 'import site; print site.getusersitepackages()'
+    fi
 }
 
 # Input:  <python-path>
@@ -267,11 +284,11 @@ if [ "${BACKEND_GDB}" -ne 1 ] && [ "${BACKEND_LLDB}" -ne 1 ]; then
     # Find system Python
     PYTHON=$(command -v python)
     PYVER=$(${PYTHON} -c 'import platform; print(".".join(platform.python_version_tuple()[:2]))')
-    if [ -z $USER_MODE ]; then
-        PYTHON_SITE_PACKAGES=$(${PYTHON} -c 'import site; print(site.getsitepackages()[0])')
-    else
-        PYTHON_SITE_PACKAGES=$(${PYTHON} -c 'import site; print(site.getusersitepackages())')
-    fi
+    # if [ -z $USER_MODE ]; then
+    #     PYTHON_SITE_PACKAGES=$(${PYTHON} -c 'import site; print(site.getsitepackages()[0])')
+    # else
+    #     PYTHON_SITE_PACKAGES=$(${PYTHON} -c 'import site; print(site.getusersitepackages())')
+    # fi
 
     install_packages
 
@@ -312,6 +329,8 @@ fi
 if [ "${BACKEND_GDB}" -eq 1 ] || [ "${BACKEND_LLDB}" -eq 1 ]; then
     EXE_PATH="$(get_executable_path)"
     if [ -z "${EXE_PATH}" ]; then 
+		PYTHON=$(command -v python)
+		PYTHON_SITE_PACKAGES="$(get_lib_path ${PYTHON})"
         PREFIX_DIR=${PYTHON_SITE_PACKAGES%lib*}
         if ! [ "${PREFIX_DIR}" == "${PYTHON_SITE_PACKAGES}" ]; then 
             BIN_DIR=${PREFIX_DIR}bin
