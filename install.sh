@@ -338,10 +338,12 @@ if [ "${BACKEND_GDB}" -eq 1 ] || [ "${BACKEND_LLDB}" -eq 1 ]; then
     EXE_PATH="$(get_executable_path)"
     if [ -z "${EXE_PATH}" ]; then 
         BIN_DIR="$(find_executable_basedir)"
-        if [ -e "${BIN_DIR}/voltron" ]; then
-            printf "\nIf have issues of comand not found, one of the following lines should help.\n"
-            printf "  export PATH=\"\$PATH:%s\" >> ~/.bashrc" "$BIN_DIR"
-            printf "  export PATH=\"\$PATH:%s\" >> ~/.zshrc" "$BIN_DIR"
+        if [ -e ${BIN_DIR}/voltron ]; then
+            BIN_DIR="$(echo "$BIN_DIR" | sed "s;$HOME;\$HOME;g")"
+            echo ""
+            echo "If have issues of comand not found, one of the following lines should help."
+            echo "echo 'export PATH=\"\$PATH:${BIN_DIR}\"' >> ~/.bashrc"
+            echo "echo 'export PATH=\"\$PATH:${BIN_DIR}\"' >> ~/.zshrc"
         fi
     else
         echo "Installed path for \"voltron\": ${EXE_PATH}" 
